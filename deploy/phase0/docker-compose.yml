@@ -1,0 +1,27 @@
+services:
+  upstream:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=a
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  proxy:
+    build:
+      context: ../..
+      dockerfile: docker/proxy/Dockerfile
+    environment:
+      - LISTEN_ADDR=:8080
+      - UPSTREAM_ADDRS=upstream:9000
+      - PROXY_MODE=tcp-sync
+    ports:
+      - "8080:8080"
+    depends_on:
+      upstream:
+        condition: service_healthy

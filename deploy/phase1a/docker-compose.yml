@@ -1,0 +1,57 @@
+services:
+  upstream-a:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=a
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-b:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=b
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-c:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=c
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  proxy:
+    build:
+      context: ../..
+      dockerfile: docker/proxy/Dockerfile
+    environment:
+      - LISTEN_ADDR=:8080
+      - UPSTREAM_ADDRS=upstream-a:9000,upstream-b:9000,upstream-c:9000
+      - PROXY_MODE=tcp-goroutine
+    ports:
+      - "8080:8080"
+    depends_on:
+      upstream-a:
+        condition: service_healthy
+      upstream-b:
+        condition: service_healthy
+      upstream-c:
+        condition: service_healthy

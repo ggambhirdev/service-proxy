@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package echo;
+
+option go_package = "ggambhir.dev/service-proxy/internal/grpcproxy/proto";
+
+// EchoService is the phase 2b client<->proxy protocol: a unary RPC that
+// mirrors the HTTP /echo semantics used in phases 0/1a/1b/2a. gRPC's stream
+// multiplexing over a single HTTP/2 connection is inherent regardless of
+// unary vs. streaming, so a unary RPC is sufficient to demonstrate it.
+service EchoService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  bytes payload = 1;
+}
+
+message EchoResponse {
+  bytes payload = 1;
+  string upstream_id = 2;
+}
