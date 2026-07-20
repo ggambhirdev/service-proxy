@@ -68,7 +68,8 @@ func handleStream(stream *quic.Stream, selector upstream.Selector, forwarder ups
 		return
 	}
 
-	addr := selector.Next()
+	addr, tok := selector.Next()
+	defer selector.Release(tok)
 	resp, err := forwarder.Forward(addr, &upstream.Request{
 		Method: http.MethodPost,
 		Path:   "/echo",

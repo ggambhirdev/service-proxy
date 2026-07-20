@@ -1,0 +1,149 @@
+services:
+  upstream-a:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=a
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-b:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=b
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-c:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=c
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-d:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=d
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-e:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=e
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  # upstream-f/g/h are deliberately slow (random 50-150ms per request) so the
+  # load-aware selectors (least-conn, p2c) have backends to steer away from.
+  # Round-robin ignores this and spreads load evenly regardless.
+  upstream-f:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=f
+      - RESPONSE_DELAY_MIN_MS=50
+      - RESPONSE_DELAY_MAX_MS=150
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-g:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=g
+      - RESPONSE_DELAY_MIN_MS=50
+      - RESPONSE_DELAY_MAX_MS=150
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  upstream-h:
+    build:
+      context: ../..
+      dockerfile: docker/upstream/Dockerfile
+    environment:
+      - ECHO_ADDR=:9000
+      - UPSTREAM_ID=h
+      - RESPONSE_DELAY_MIN_MS=50
+      - RESPONSE_DELAY_MAX_MS=150
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9000/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  proxy:
+    build:
+      context: ../..
+      dockerfile: docker/proxy/Dockerfile
+    environment:
+      - LISTEN_ADDR=:8080
+      - UPSTREAM_ADDRS=upstream-a:9000,upstream-b:9000,upstream-c:9000,upstream-d:9000,upstream-e:9000,upstream-f:9000,upstream-g:9000,upstream-h:9000
+      - PROXY_MODE=pooled
+      # LB_STRATEGY is substituted from the host env (round-robin | least-conn
+      # | p2c) so one file drives phases 5a/5b/5c; defaults to round-robin.
+      - LB_STRATEGY=${LB_STRATEGY:-round-robin}
+      - STATS_ADDR=:9090
+      - POOL_SIZE_PER_UPSTREAM=16
+      - WORKER_POOL_SIZE=64
+      - WORKER_QUEUE_DEPTH=256
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    depends_on:
+      upstream-a:
+        condition: service_healthy
+      upstream-b:
+        condition: service_healthy
+      upstream-c:
+        condition: service_healthy
+      upstream-d:
+        condition: service_healthy
+      upstream-e:
+        condition: service_healthy
+      upstream-f:
+        condition: service_healthy
+      upstream-g:
+        condition: service_healthy
+      upstream-h:
+        condition: service_healthy

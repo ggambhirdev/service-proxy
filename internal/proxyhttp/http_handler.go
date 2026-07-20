@@ -21,7 +21,8 @@ func Handler(selector upstream.Selector, forwarder upstream.Forwarder) http.Hand
 			return
 		}
 
-		addr := selector.Next()
+		addr, tok := selector.Next()
+		defer selector.Release(tok)
 		resp, err := forwarder.Forward(addr, &upstream.Request{
 			Method: r.Method,
 			Path:   r.URL.RequestURI(),

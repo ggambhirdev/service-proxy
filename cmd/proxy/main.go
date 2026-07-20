@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net"
 	"net/http"
@@ -23,7 +24,11 @@ import (
 
 func main() {
 	cfg := config.Load()
-	selector := upstream.NewSelector(cfg.UpstreamAddrs)
+	selector := upstream.NewSelector(cfg.UpstreamAddrs, cfg.LBStrategy)
+
+	if sp, ok := selector.(upstream.StatsProvider); ok && cfg.StatsAddr != "" {
+		go serveStats(cfg.StatsAddr, sp)
+	}
 
 	switch cfg.Mode {
 	case config.ModeQUIC:
@@ -163,5 +168,27 @@ func serveHTTP2(ln net.Listener, selector upstream.Selector) {
 	srv := &http.Server{Handler: handler}
 	if err := srv.Serve(ln); err != nil {
 		log.Fatalf("http2 serve: %v", err)
+	}
+}
+
+// serveStats exposes per-upstream request distribution over HTTP for phase 5
+// (enabled by STATS_ADDR). It runs on its own listener, out of band from the
+// proxy's request hot path. GET /stats returns a JSON snapshot of every
+// upstream's cumulative and in-flight request counts; GET /stats?reset=1
+// zeroes the cumulative counters after snapshotting, so a benchmark can
+// discard its warmup and record only the measured run's distribution.
+func serveStats(addr string, sp upstream.StatsProvider) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		reset := r.URL.Query().Get("reset") == "1"
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(sp.Stats(reset)); err != nil {
+			log.Printf("stats encode: %v", err)
+		}
+	})
+
+	log.Printf("stats endpoint listening on %s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Printf("stats server: %v", err)
 	}
 }

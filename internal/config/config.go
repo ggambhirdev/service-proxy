@@ -34,6 +34,16 @@ type Config struct {
 	// Mode selects the proxy implementation (see Mode constants).
 	Mode Mode
 
+	// LBStrategy selects the load-balancing strategy (phase 5): one of
+	// upstream.LBRoundRobin / LBLeastConn / LBP2C. Empty keeps the
+	// pre-phase-5 behavior (Fixed / plain round-robin), so phases 0-3b are
+	// unaffected.
+	LBStrategy string
+	// StatsAddr, if non-empty, is the address of an out-of-band HTTP
+	// endpoint exposing per-upstream request distribution (phase 5). Empty
+	// disables it.
+	StatsAddr string
+
 	// PoolSizePerUpstream bounds the number of pooled connections kept open
 	// to each upstream (phase 2+).
 	PoolSizePerUpstream int
@@ -52,6 +62,8 @@ func Load() Config {
 		ListenAddr:          getEnv("LISTEN_ADDR", ":8080"),
 		UpstreamAddrs:       splitAddrs(getEnv("UPSTREAM_ADDRS", getEnv("UPSTREAM_ADDR", "upstream:9000"))),
 		Mode:                Mode(getEnv("PROXY_MODE", string(ModeTCPSync))),
+		LBStrategy:          getEnv("LB_STRATEGY", ""),
+		StatsAddr:           getEnv("STATS_ADDR", ""),
 		PoolSizePerUpstream: getEnvInt("POOL_SIZE_PER_UPSTREAM", 16),
 		WorkerPoolSize:      getEnvInt("WORKER_POOL_SIZE", 64),
 		WorkerQueueDepth:    getEnvInt("WORKER_QUEUE_DEPTH", 256),

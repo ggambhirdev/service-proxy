@@ -32,7 +32,8 @@ type Server struct {
 // Echo forwards req.Payload to an upstream over HTTP and returns its
 // response body.
 func (s *Server) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
-	addr := s.Selector.Next()
+	addr, tok := s.Selector.Next()
+	defer s.Selector.Release(tok)
 
 	resp, err := s.Forwarder.Forward(addr, &upstream.Request{
 		Method: http.MethodPost,

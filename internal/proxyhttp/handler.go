@@ -38,7 +38,8 @@ func HandleConn(conn net.Conn, selector upstream.Selector, forwarder upstream.Fo
 		return
 	}
 
-	addr := selector.Next()
+	addr, tok := selector.Next()
+	defer selector.Release(tok)
 	resp, err := forwarder.Forward(addr, &upstream.Request{
 		Method: req.Method,
 		Path:   req.URL.RequestURI(),
