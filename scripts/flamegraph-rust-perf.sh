@@ -134,7 +134,7 @@ if [[ "${HOST}" == "1" ]]; then
     quic|http3) LISTEN=":8443" ;;
   esac
 
-  ECHO_ADDR=:9000 UPSTREAM_ID=a go run "${ROOT}/go/cmd/echo-upstream" &
+  (cd "${ROOT}/go" && ECHO_ADDR=:9000 UPSTREAM_ID=a go run ./cmd/echo-upstream) &
   ECHO_PID=$!
   sleep 1
 
