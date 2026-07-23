@@ -28,6 +28,15 @@ case "${PHASE}" in
   5) COMPOSE="deploy/phase5/docker-compose.yml" ;;
 esac
 
+# deploy/phase5/docker-compose.yml substitutes LB_STRATEGY from the host
+# env and defaults to round-robin if unset — easy to silently profile the
+# wrong selector. Require it explicitly for phase 5 instead of guessing.
+if [[ "${PHASE}" == "5" && -z "${LB_STRATEGY:-}" ]]; then
+  echo "PHASE=5 needs LB_STRATEGY set (round-robin|least-conn|p2c), e.g.:" >&2
+  echo "  LB_STRATEGY=p2c make flamegraph-go PHASE=5 N=4000" >&2
+  exit 1
+fi
+
 export PROXY_IMPL=go
 export PPROF_ADDR=:6060
 
