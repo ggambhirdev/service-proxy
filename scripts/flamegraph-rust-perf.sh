@@ -47,13 +47,19 @@ proxy_mode_for_phase() {
 fold_perf_to_svg() {
   local data="$1"
   local out="$2"
+  # perf script needs to read /proc/kallsyms to resolve kernel-side frames;
+  # kernel.kptr_restrict hides real addresses from non-root on most distros,
+  # so run just this step (not the folding/rendering after it) via sudo.
+  # sudo's PATH won't have inferno/flamegraph.pl (installed under the
+  # invoking user's home), which is exactly why only `perf script` is
+  # elevated here and the rest of the pipe stays as the normal user.
   if command -v inferno-collapse-perf >/dev/null && command -v inferno-flamegraph >/dev/null; then
-    perf script -i "${data}" | inferno-collapse-perf | inferno-flamegraph > "${out}"
+    sudo perf script -i "${data}" | inferno-collapse-perf | inferno-flamegraph > "${out}"
   elif command -v stackcollapse-perf.pl >/dev/null && command -v flamegraph.pl >/dev/null; then
-    perf script -i "${data}" | stackcollapse-perf.pl | flamegraph.pl > "${out}"
+    sudo perf script -i "${data}" | stackcollapse-perf.pl | flamegraph.pl > "${out}"
   else
     echo "Install FlameGraph (stackcollapse-perf.pl + flamegraph.pl) or inferno to convert ${data}" >&2
-    perf script -i "${data}" > "${data}.script.txt"
+    sudo perf script -i "${data}" > "${data}.script.txt"
     echo "Wrote ${data} and ${data}.script.txt"
     return 1
   fi
@@ -100,7 +106,16 @@ record_perf() {
   if [[ "$(id -u)" -eq 0 ]]; then
     "${cmd[@]}"
   else
-    sudo "${cmd[@]}" || "${cmd[@]}"
+    local invoking_user
+    invoking_user="$(id -un)"
+    if sudo "${cmd[@]}"; then
+      # sudo perf writes ${data} as root; hand it back to the invoking user
+      # so the (non-sudo) perf script / inferno / flamegraph.pl step below
+      # can actually read it.
+      sudo chown "${invoking_user}" "${data}" 2>/dev/null || true
+    else
+      "${cmd[@]}"
+    fi
   fi
 }
 
