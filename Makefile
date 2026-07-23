@@ -1,5 +1,5 @@
 .PHONY: bench0 bench1a bench1b bench2a bench2b bench3a bench3b bench4 bench5 \
-	flamegraph-go flamegraph-rust-pprof flamegraph-rust-perf
+	flamegraph-go flamegraph-rust-pprof flamegraph-rust-perf flamegraph-rust-offcpu
 
 # go | rust — selects which proxy Dockerfile compose builds. Upstream is
 # always Go (docker/upstream/Dockerfile.go).
@@ -179,11 +179,13 @@ bench5:
 # benches: capture profiles yourself under steady-state load.
 #
 #   make flamegraph-go PHASE=2a N=2000
-#   make flamegraph-rust-pprof PHASE=1a N=500   # userspace; fair vs Go pprof
-#   make flamegraph-rust-perf PHASE=1a N=500    # perf; includes kernel
+#   make flamegraph-rust-pprof PHASE=1a N=500     # userspace; fair vs Go pprof
+#   make flamegraph-rust-perf PHASE=1a N=500      # on-CPU perf; includes kernel
 #   make flamegraph-rust-perf HOST=1 PHASE=2a N=500
+#   make flamegraph-rust-offcpu HOST=1 PHASE=1a N=500   # off-CPU (blocking/waiting)
 PHASE ?= 2a
 N ?= 2000
+DURATION ?= 30
 HOST ?= 0
 FG_OUT := benchmark-findings/output/flamegraphs
 
@@ -195,3 +197,6 @@ flamegraph-rust-pprof:
 
 flamegraph-rust-perf:
 	@HOST=$(HOST) scripts/flamegraph-rust-perf.sh $(PHASE) $(N)
+
+flamegraph-rust-offcpu:
+	@HOST=$(HOST) scripts/flamegraph-rust-offcpu.sh $(PHASE) $(N) $(DURATION)
