@@ -1,0 +1,10 @@
+[package]
+name = "grpc-smoke-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+tonic = { workspace = true }
+proto = { workspace = true }
+clap = { workspace = true }

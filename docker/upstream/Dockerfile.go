@@ -1,8 +1,8 @@
 FROM golang:1.26 AS builder
 WORKDIR /src
-COPY go.mod ./
-COPY cmd/echo-upstream ./cmd/echo-upstream
-COPY internal ./internal
+COPY go/go.mod ./
+COPY go/cmd/echo-upstream ./cmd/echo-upstream
+COPY go/internal ./internal
 RUN CGO_ENABLED=0 go build -o /out/echo-upstream ./cmd/echo-upstream
 
 FROM alpine:3.24

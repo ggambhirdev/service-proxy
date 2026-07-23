@@ -1,6 +1,11 @@
-.PHONY: bench0 bench1a bench1b bench2a bench2b bench3a bench3b bench4 bench5
+.PHONY: bench0 bench1a bench1b bench2a bench2b bench3a bench3b bench4 bench5 flamegraph-go flamegraph-rust
 
-OUT_DIR := benchmark-findings/output/raw
+# go | rust — selects which proxy Dockerfile compose builds. Upstream is
+# always Go (docker/upstream/Dockerfile.go).
+PROXY_IMPL ?= go
+export PROXY_IMPL
+
+OUT_DIR := benchmark-findings/output/raw/$(PROXY_IMPL)
 
 PHASE0_N := 100 250 500 1000 2000
 PHASE1_N := 100 250 500 1000 2000 3000 4000
@@ -14,49 +19,51 @@ PHASE4_CASES := baseline loss1 loss5 jitter50
 # distinct name so it doesn't shadow the plain oha used by the other targets.
 OHA_HTTP3 ?= oha-http3
 
+COMPOSE = PROXY_IMPL=$(PROXY_IMPL) docker compose
+
 # Phase 0: TCP baseline (single client/proxy/upstream, HTTP/1.1)
 bench0:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase0/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase0/docker-compose.yml up --build -d --wait
 	for n in $(PHASE0_N); do \
-		echo "=== Phase 0, N=$$n ==="; \
+		echo "=== Phase 0 ($(PROXY_IMPL)), N=$$n ==="; \
 		oha -z 10s -q $$n -c 50 --latency-correction http://localhost:8080 > /dev/null; \
 		oha -z 30s -q $$n -c 50 --latency-correction http://localhost:8080 > $(OUT_DIR)/phase0_N$$n.txt; \
 	done
-	docker compose -f deploy/phase0/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase0/docker-compose.yml down
 
-# Phase 1a: goroutine-per-connection concurrency, HTTP/1.1
+# Phase 1a: goroutine/task-per-connection concurrency, HTTP/1.1
 bench1a:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase1a/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase1a/docker-compose.yml up --build -d --wait
 	for n in $(PHASE1_N); do \
-		echo "=== Phase 1a, N=$$n ==="; \
+		echo "=== Phase 1a ($(PROXY_IMPL)), N=$$n ==="; \
 		oha -z 10s -q $$n -c 50 --latency-correction http://localhost:8080 > /dev/null; \
 		oha -z 30s -q $$n -c 50 --latency-correction http://localhost:8080 > $(OUT_DIR)/phase1a_N$$n.txt; \
 	done
-	docker compose -f deploy/phase1a/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase1a/docker-compose.yml down
 
 # Phase 1b: HTTP/2 (h2c), /echo endpoint
 bench1b:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase1b/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase1b/docker-compose.yml up --build -d --wait
 	for n in $(PHASE1_N); do \
-		echo "=== Phase 1b, N=$$n ==="; \
+		echo "=== Phase 1b ($(PROXY_IMPL)), N=$$n ==="; \
 		oha -z 10s -q $$n -c 1 -p 50 --latency-correction --http2 http://localhost:8080/echo > /dev/null; \
 		oha -z 30s -q $$n -c 1 -p 50 --latency-correction --http2 http://localhost:8080/echo > $(OUT_DIR)/phase1b_N$$n.txt; \
 	done
-	docker compose -f deploy/phase1b/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase1b/docker-compose.yml down
 
 # Phase 2a: pooled upstream connections + worker pool, HTTP/1.1
 bench2a:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase2a/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase2a/docker-compose.yml up --build -d --wait
 	for n in $(PHASE1_N); do \
-		echo "=== Phase 2a, N=$$n ==="; \
+		echo "=== Phase 2a ($(PROXY_IMPL)), N=$$n ==="; \
 		oha -z 10s -q $$n -c 50 --latency-correction http://localhost:8080 > /dev/null; \
 		oha -z 30s -q $$n -c 50 --latency-correction http://localhost:8080 > $(OUT_DIR)/phase2a_N$$n.txt; \
 	done
-	docker compose -f deploy/phase2a/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase2a/docker-compose.yml down
 
 # Phase 2b: gRPC over HTTP/2, pooled upstream connections
 #
@@ -68,43 +75,44 @@ bench2a:
 # Two separate runs, neither using --skipFirst, avoids this entirely.
 bench2b:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase2b/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase2b/docker-compose.yml up --build -d --wait
 	for n in $(PHASE1_N); do \
-		echo "=== Phase 2b, N=$$n ==="; \
+		echo "=== Phase 2b ($(PROXY_IMPL)), N=$$n ==="; \
 		ghz -z 10s -r $$n -c 50 --connections=1 --async --insecure \
 			--data '{"payload": ""}' \
-			--proto internal/grpcproxy/proto/echo.proto \
+			--proto proto/echo.proto \
 			--call echo.EchoService.Echo \
 			localhost:8080 > /dev/null; \
 		ghz -z 30s -r $$n -c 50 --connections=1 --async --insecure \
 			--data '{"payload": ""}' \
-			--proto internal/grpcproxy/proto/echo.proto \
+			--proto proto/echo.proto \
 			--call echo.EchoService.Echo \
 			localhost:8080 > $(OUT_DIR)/phase2b_N$$n.txt; \
 	done
-	docker compose -f deploy/phase2b/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase2b/docker-compose.yml down
 
-# Phase 3a: raw QUIC, in-house open-loop load generator (cmd/quic-bench-client)
+# Phase 3a: raw QUIC — always the Go quic-bench-client (wire-compatible with
+# both Go and Rust proxies).
 bench3a:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase3a/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase3a/docker-compose.yml up --build -d --wait
 	for n in $(PHASE1_N); do \
-		echo "=== Phase 3a, N=$$n ==="; \
-		go run ./cmd/quic-bench-client -addr localhost:8443 -rate $$n -duration 10s > /dev/null; \
-		go run ./cmd/quic-bench-client -addr localhost:8443 -rate $$n -duration 30s > $(OUT_DIR)/phase3a_N$$n.txt; \
+		echo "=== Phase 3a ($(PROXY_IMPL)), N=$$n ==="; \
+		(cd go && go run ./cmd/quic-bench-client -addr localhost:8443 -rate $$n -duration 10s) > /dev/null; \
+		(cd go && go run ./cmd/quic-bench-client -addr localhost:8443 -rate $$n -duration 30s) > $(OUT_DIR)/phase3a_N$$n.txt; \
 	done
-	docker compose -f deploy/phase3a/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase3a/docker-compose.yml down
 
 # Phase 3b: HTTP/3 over QUIC, oha experimental http3 build (see OHA_HTTP3 above)
 bench3b:
 	mkdir -p $(OUT_DIR)
-	docker compose -f deploy/phase3b/docker-compose.yml up --build -d --wait
+	$(COMPOSE) -f deploy/phase3b/docker-compose.yml up --build -d --wait
 	for n in $(PHASE1_N); do \
-		echo "=== Phase 3b, N=$$n ==="; \
+		echo "=== Phase 3b ($(PROXY_IMPL)), N=$$n ==="; \
 		$(OHA_HTTP3) -z 10s -q $$n -c 50 --http-version 3 --insecure --latency-correction https://localhost:8443/echo > /dev/null; \
 		$(OHA_HTTP3) -z 30s -q $$n -c 50 --http-version 3 --insecure --latency-correction https://localhost:8443/echo > $(OUT_DIR)/phase3b_N$$n.txt; \
 	done
-	docker compose -f deploy/phase3b/docker-compose.yml down
+	$(COMPOSE) -f deploy/phase3b/docker-compose.yml down
 
 # Phase 4: stress conditions. Re-runs the pooled phases (2a pooled HTTP/1.1,
 # 2b gRPC, 3b HTTP/3) unchanged, under tc netem packet loss / jitter injected
@@ -117,8 +125,8 @@ bench4:
 	mkdir -p $(OUT_DIR)
 	for phase in 2a 2b 3b; do \
 		compose=deploy/phase$$phase/docker-compose.yml; \
-		echo "=== Phase 4, proxy phase=$$phase ==="; \
-		docker compose -f $$compose up --build -d --wait; \
+		echo "=== Phase 4 ($(PROXY_IMPL)), proxy phase=$$phase ==="; \
+		$(COMPOSE) -f $$compose up --build -d --wait; \
 		for case in $(PHASE4_CASES); do \
 			scripts/netem.sh $$compose del >/dev/null 2>&1 || true; \
 			case "$$case" in \
@@ -133,15 +141,15 @@ bench4:
 				case "$$phase" in \
 					2a) oha -z 10s -q $$n -c 50 --latency-correction http://localhost:8080/echo > /dev/null; \
 					    oha -z 30s -q $$n -c 50 --latency-correction http://localhost:8080/echo > $$out ;; \
-					2b) ghz -z 10s -r $$n -c 50 --connections=1 --async --insecure --data '{"payload": ""}' --proto internal/grpcproxy/proto/echo.proto --call echo.EchoService.Echo localhost:8080 > /dev/null; \
-					    ghz -z 30s -r $$n -c 50 --connections=1 --async --insecure --data '{"payload": ""}' --proto internal/grpcproxy/proto/echo.proto --call echo.EchoService.Echo localhost:8080 > $$out ;; \
+					2b) ghz -z 10s -r $$n -c 50 --connections=1 --async --insecure --data '{"payload": ""}' --proto proto/echo.proto --call echo.EchoService.Echo localhost:8080 > /dev/null; \
+					    ghz -z 30s -r $$n -c 50 --connections=1 --async --insecure --data '{"payload": ""}' --proto proto/echo.proto --call echo.EchoService.Echo localhost:8080 > $$out ;; \
 					3b) $(OHA_HTTP3) -z 10s -q $$n -c 50 --http-version 3 --insecure --latency-correction https://localhost:8443/echo > /dev/null; \
 					    $(OHA_HTTP3) -z 30s -q $$n -c 50 --http-version 3 --insecure --latency-correction https://localhost:8443/echo > $$out ;; \
 				esac; \
 			done; \
 		done; \
 		scripts/netem.sh $$compose del >/dev/null 2>&1 || true; \
-		docker compose -f $$compose down; \
+		$(COMPOSE) -f $$compose down; \
 	done
 
 # Phase 5: load balancing (pooled HTTP/1.1, 8 upstreams; f/g/h deliberately
@@ -150,14 +158,12 @@ bench4:
 # (not /) so the slow upstreams' artificial delay actually fires. Alongside
 # oha latency/throughput it captures per-upstream request distribution from
 # the proxy's /stats endpoint (:9090), resetting after the warmup so the
-# recorded distribution reflects only the measured run. The distribution is
-# the point: least-conn/p2c should route around f/g/h that round-robin hits
-# evenly.
+# recorded distribution reflects only the measured run.
 bench5:
 	mkdir -p $(OUT_DIR)
 	for s in round-robin least-conn p2c; do \
-		echo "=== Phase 5, strategy=$$s ==="; \
-		LB_STRATEGY=$$s docker compose -f deploy/phase5/docker-compose.yml up --build -d --wait; \
+		echo "=== Phase 5 ($(PROXY_IMPL)), strategy=$$s ==="; \
+		LB_STRATEGY=$$s $(COMPOSE) -f deploy/phase5/docker-compose.yml up --build -d --wait; \
 		for n in $(PHASE1_N); do \
 			echo "--- strategy=$$s N=$$n ---"; \
 			oha -z 10s -q $$n -c 50 --latency-correction http://localhost:8080/echo > /dev/null; \
@@ -165,5 +171,20 @@ bench5:
 			oha -z 30s -q $$n -c 50 --latency-correction http://localhost:8080/echo > $(OUT_DIR)/phase5_$${s}_N$$n.txt; \
 			curl -s http://localhost:9090/stats > $(OUT_DIR)/phase5_$${s}_N$$n.stats.json; \
 		done; \
-		docker compose -f deploy/phase5/docker-compose.yml down; \
+		LB_STRATEGY=$$s $(COMPOSE) -f deploy/phase5/docker-compose.yml down; \
 	done
+
+# Flamegraphs, opt-in. Does not run as part of automated
+# benches: capture profiles yourself under steady-state load.
+#
+#   make flamegraph-go PHASE=2a N=2000
+#   make flamegraph-rust PHASE=2a N=2000
+PHASE ?= 2a
+N ?= 2000
+FG_OUT := benchmark-findings/output/flamegraphs
+
+flamegraph-go:
+	@scripts/flamegraph-go.sh $(PHASE) $(N)
+
+flamegraph-rust:
+	@scripts/flamegraph-rust.sh $(PHASE) $(N)

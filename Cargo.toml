@@ -1,0 +1,44 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/service-proxy",
+    "crates/proto",
+    "crates/grpc-smoke-client",
+    "crates/quic-smoke-client",
+    "crates/http3-smoke-client",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+bytes = "1"
+http = "1"
+httparse = "1"
+hyper = { version = "1", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+http-body-util = "0.1"
+tonic = { version = "0.14", features = ["transport"] }
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
+prost = "0.14"
+quinn = "0.11"
+h3 = "0.0.8"
+h3-quinn = "0.0.10"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rcgen = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand = "0.10"
+futures = "0.3"
+tower = "0.5"
+pin-project-lite = "0.2"
+proto = { path = "crates/proto" }
+clap = { version = "4", features = ["derive"] }

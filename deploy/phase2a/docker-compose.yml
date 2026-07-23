@@ -2,7 +2,7 @@ services:
   upstream-a:
     build:
       context: ../..
-      dockerfile: docker/upstream/Dockerfile
+      dockerfile: docker/upstream/Dockerfile.go
     environment:
       - ECHO_ADDR=:9000
       - UPSTREAM_ID=a
@@ -15,7 +15,7 @@ services:
   upstream-b:
     build:
       context: ../..
-      dockerfile: docker/upstream/Dockerfile
+      dockerfile: docker/upstream/Dockerfile.go
     environment:
       - ECHO_ADDR=:9000
       - UPSTREAM_ID=b
@@ -28,7 +28,7 @@ services:
   upstream-c:
     build:
       context: ../..
-      dockerfile: docker/upstream/Dockerfile
+      dockerfile: docker/upstream/Dockerfile.go
     environment:
       - ECHO_ADDR=:9000
       - UPSTREAM_ID=c
@@ -41,7 +41,7 @@ services:
   proxy:
     build:
       context: ../..
-      dockerfile: docker/proxy/Dockerfile
+      dockerfile: docker/proxy/Dockerfile.${PROXY_IMPL:-go}
     environment:
       - LISTEN_ADDR=:8080
       - UPSTREAM_ADDRS=upstream-a:9000,upstream-b:9000,upstream-c:9000

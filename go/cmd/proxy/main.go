@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/quic-go/quic-go/http3"
 	"golang.org/x/net/http2"
@@ -25,6 +26,10 @@ import (
 func main() {
 	cfg := config.Load()
 	selector := upstream.NewSelector(cfg.UpstreamAddrs, cfg.LBStrategy)
+
+	if cfg.PprofAddr != "" {
+		go servePprof(cfg.PprofAddr)
+	}
 
 	if sp, ok := selector.(upstream.StatsProvider); ok && cfg.StatsAddr != "" {
 		go serveStats(cfg.StatsAddr, sp)
@@ -190,5 +195,14 @@ func serveStats(addr string, sp upstream.StatsProvider) {
 	log.Printf("stats endpoint listening on %s", addr)
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Printf("stats server: %v", err)
+	}
+}
+
+// servePprof exposes net/http/pprof on addr (PPROF_ADDR). Opt-in so default
+// benches stay uninstrumented; used for phase 6 Go flamegraphs.
+func servePprof(addr string) {
+	log.Printf("pprof endpoint listening on %s", addr)
+	if err := http.ListenAndServe(addr, nil); err != nil {
+		log.Printf("pprof server: %v", err)
 	}
 }

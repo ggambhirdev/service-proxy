@@ -1,0 +1,13 @@
+FROM rust:alpine AS builder
+RUN apk add --no-cache musl-dev protobuf-dev protoc
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+COPY proto ./proto
+RUN cargo build --release -p service-proxy \
+ && cp /src/target/release/service-proxy /proxy
+
+FROM alpine:3.24
+COPY --from=builder /proxy /proxy
+EXPOSE 8080
+ENTRYPOINT ["/proxy"]

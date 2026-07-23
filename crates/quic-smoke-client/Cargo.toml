@@ -1,0 +1,11 @@
+[package]
+name = "quic-smoke-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+quinn = { workspace = true }
+rustls = { workspace = true }
+rcgen = { workspace = true }
+clap = { workspace = true }

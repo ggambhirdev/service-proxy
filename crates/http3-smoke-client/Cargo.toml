@@ -1,0 +1,15 @@
+[package]
+name = "http3-smoke-client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio = { workspace = true }
+quinn = { workspace = true }
+h3 = { workspace = true }
+h3-quinn = { workspace = true }
+http = { workspace = true }
+bytes = { workspace = true }
+rustls = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }

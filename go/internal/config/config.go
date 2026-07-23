@@ -43,6 +43,10 @@ type Config struct {
 	// endpoint exposing per-upstream request distribution (phase 5). Empty
 	// disables it.
 	StatsAddr string
+	// PprofAddr, if non-empty, is the address of an out-of-band HTTP
+	// endpoint serving net/http/pprof (phase 6 flamegraphs). Empty disables
+	// it so hot-path benches stay uninstrumented.
+	PprofAddr string
 
 	// PoolSizePerUpstream bounds the number of pooled connections kept open
 	// to each upstream (phase 2+).
@@ -64,6 +68,7 @@ func Load() Config {
 		Mode:                Mode(getEnv("PROXY_MODE", string(ModeTCPSync))),
 		LBStrategy:          getEnv("LB_STRATEGY", ""),
 		StatsAddr:           getEnv("STATS_ADDR", ""),
+		PprofAddr:           getEnv("PPROF_ADDR", ""),
 		PoolSizePerUpstream: getEnvInt("POOL_SIZE_PER_UPSTREAM", 16),
 		WorkerPoolSize:      getEnvInt("WORKER_POOL_SIZE", 64),
 		WorkerQueueDepth:    getEnvInt("WORKER_QUEUE_DEPTH", 256),

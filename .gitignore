@@ -1,3 +1,4 @@
 benchmark-findings/*
-# claude generated correctness tests LOL
-scripts/smoke* 
+/target/
+**/*.rs.bk
+.flamegraph-compose.override.yml
