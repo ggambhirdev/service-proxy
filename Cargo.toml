@@ -42,3 +42,8 @@ tower = "0.5"
 pin-project-lite = "0.2"
 proto = { path = "crates/proto" }
 clap = { version = "4", features = ["derive"] }
+
+# Line tables keep pprof-rs / perf flamegraphs symbolicated without full
+# debuginfo size; does not change runtime codegen quality.
+[profile.release]
+debug = "line-tables-only"

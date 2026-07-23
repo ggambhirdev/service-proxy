@@ -2,6 +2,7 @@
 
 mod config;
 mod grpc_proxy;
+mod pprof_server;
 mod proxy_http;
 mod quic_proxy;
 mod upstream;
@@ -36,12 +37,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let selector = new_selector(cfg.upstream_addrs.clone(), &cfg.lb_strategy);
 
     if !cfg.pprof_addr.is_empty() {
-        // pprof for Rust is via flamegraph scripts / cargo-flamegraph, not an
-        // in-process HTTP endpoint. Log so mis-set env is visible.
-        warn!(
-            "PPROF_ADDR={} set but Rust proxy has no pprof HTTP server; use make flamegraph-rust",
-            cfg.pprof_addr
-        );
+        let addr = parse_listen_addr(&cfg.pprof_addr)?;
+        tokio::spawn(async move {
+            if let Err(e) = pprof_server::serve_pprof(addr).await {
+                warn!("pprof server: {e}");
+            }
+        });
     }
 
     if selector.has_stats() && !cfg.stats_addr.is_empty() {

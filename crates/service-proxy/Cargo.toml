@@ -33,4 +33,7 @@ futures = { workspace = true }
 tower = { workspace = true }
 proto = { workspace = true }
 tokio-stream = "0.1"
+# Userspace CPU profiles (SIGPROF), Go-comparable via PPROF_ADDR HTTP endpoints.
+# Pair with scripts/flamegraph-rust-pprof.sh; use flamegraph-rust-perf.sh for kernel.
+pprof = { version = "0.15", features = ["flamegraph", "prost-codec"] }
 
