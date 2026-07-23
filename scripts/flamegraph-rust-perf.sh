@@ -174,6 +174,12 @@ if [[ "${HOST}" == "1" ]]; then
     kill "${PROXY_PID}" "${ECHO_PID}" >/dev/null 2>&1 || true
     wait "${PROXY_PID}" 2>/dev/null || true
     wait "${ECHO_PID}" 2>/dev/null || true
+    # `go run` execs a child binary that doesn't inherit signals sent to the
+    # wrapper PID above (SIGKILL especially can't be forwarded at all), so it
+    # can survive and keep holding :9000. Belt-and-suspenders: kill anything
+    # still matching the actual binary/port directly.
+    pkill -9 -f 'cmd/echo-upstream' >/dev/null 2>&1 || true
+    fuser -k 9000/tcp >/dev/null 2>&1 || true
   }
   trap cleanup_host EXIT
   sleep 1
