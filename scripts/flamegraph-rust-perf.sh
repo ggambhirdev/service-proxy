@@ -136,7 +136,20 @@ if [[ "${HOST}" == "1" ]]; then
 
   (cd "${ROOT}/go" && ECHO_ADDR=:9000 UPSTREAM_ID=a go run ./cmd/echo-upstream) &
   ECHO_PID=$!
-  sleep 1
+
+  echo "Waiting for upstream :9000..."
+  for i in $(seq 1 60); do
+    if (exec 3<>/dev/tcp/127.0.0.1/9000) 2>/dev/null; then
+      exec 3<&- 3>&- 2>/dev/null || true
+      echo "Upstream is up after ${i}s"
+      break
+    fi
+    if [[ "${i}" -eq 60 ]]; then
+      echo "Upstream never came up on :9000 after 60s. Aborting." >&2
+      exit 1
+    fi
+    sleep 1
+  done
 
   PROXY_MODE="${MODE}" UPSTREAM_ADDRS=127.0.0.1:9000 LISTEN_ADDR="${LISTEN}" \
     "${ROOT}/target/release/service-proxy" &
