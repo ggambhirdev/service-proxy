@@ -106,16 +106,15 @@ record_perf() {
   if [[ "$(id -u)" -eq 0 ]]; then
     "${cmd[@]}"
   else
-    local invoking_user
-    invoking_user="$(id -un)"
-    if sudo "${cmd[@]}"; then
-      # sudo perf writes ${data} as root; hand it back to the invoking user
-      # so the (non-sudo) perf script / inferno / flamegraph.pl step below
-      # can actually read it.
-      sudo chown "${invoking_user}" "${data}" 2>/dev/null || true
-    else
-      "${cmd[@]}"
-    fi
+    # Leave ${data} owned by root (whatever sudo perf record produces).
+    # fold_perf_to_svg below reads it via `sudo perf script`, and perf
+    # itself refuses to read a perf.data file unless it's owned by root or
+    # by the user invoking it (a safety check against a tampered file being
+    # read with elevated privileges) — so root reading a root-owned file is
+    # exactly what it wants. Only `perf script`'s piped stdout goes to the
+    # unprivileged inferno/flamegraph.pl step; the file itself is never
+    # touched by anything other than root.
+    sudo "${cmd[@]}" || "${cmd[@]}"
   fi
 }
 
