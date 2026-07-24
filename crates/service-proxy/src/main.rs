@@ -5,6 +5,7 @@ mod grpc_proxy;
 mod pprof_server;
 mod proxy_http;
 mod quic_proxy;
+mod tokio_metrics_server;
 mod upstream;
 
 use std::net::{SocketAddr, ToSocketAddrs};
@@ -55,6 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         });
     }
 
+    maybe_spawn_tokio_metrics(&cfg)?;
+
     match cfg.mode {
         Mode::Quic => serve_quic_mode(&cfg, selector).await?,
         Mode::Http3 => serve_http3_mode(&cfg, selector).await?,
@@ -98,6 +101,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             );
             serve_http(ln, &cfg, selector).await?;
         }
+    }
+    Ok(())
+}
+
+// See tokio_metrics_server.rs for why this is cfg-gated rather than a
+// Cargo feature: `Handle::metrics()` is a Tokio *unstable* API, enabled
+// purely via `--cfg tokio_unstable` at build time, not a dependency this
+// crate opts into — so a normal `cargo build --release` (the one used for
+// the actual Go-vs-Rust comparison numbers) is completely unaffected.
+#[cfg(tokio_unstable)]
+fn maybe_spawn_tokio_metrics(cfg: &Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if !cfg.tokio_metrics_addr.is_empty() {
+        let addr = parse_listen_addr(&cfg.tokio_metrics_addr)?;
+        tokio::spawn(async move {
+            if let Err(e) = tokio_metrics_server::serve_tokio_metrics(addr).await {
+                warn!("tokio-metrics server: {e}");
+            }
+        });
+    }
+    Ok(())
+}
+
+#[cfg(not(tokio_unstable))]
+fn maybe_spawn_tokio_metrics(cfg: &Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if !cfg.tokio_metrics_addr.is_empty() {
+        warn!(
+            "TOKIO_METRICS_ADDR is set but this binary wasn't built with \
+             --cfg tokio_unstable; ignoring"
+        );
     }
     Ok(())
 }

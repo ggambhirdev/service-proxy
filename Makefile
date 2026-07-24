@@ -1,6 +1,6 @@
 .PHONY: bench0 bench1a bench1b bench2a bench2b bench3a bench3b bench4 bench5 \
 	flamegraph-go flamegraph-rust-pprof flamegraph-rust-perf flamegraph-rust-offcpu \
-	runqlat-rust
+	runqlat-rust tokio-metrics
 
 # go | rust — selects which proxy Dockerfile compose builds. Upstream is
 # always Go (docker/upstream/Dockerfile.go).
@@ -185,6 +185,8 @@ bench5:
 #   make flamegraph-rust-perf HOST=1 PHASE=2a N=500
 #   make flamegraph-rust-offcpu HOST=1 PHASE=1a N=500   # off-CPU (blocking/waiting)
 #   make runqlat-rust HOST=1 PHASE=1a N=500             # scheduling latency histogram
+#   make tokio-metrics PHASE=1a N=500                   # Tokio runtime queue depth/busy %, Mac-friendly
+POLL_INTERVAL ?= 1
 PHASE ?= 2a
 N ?= 2000
 DURATION ?= 30
@@ -206,3 +208,6 @@ flamegraph-rust-offcpu:
 
 runqlat-rust:
 	@HOST=$(HOST) THREADS=$(THREADS) scripts/runqlat-rust.sh $(PHASE) $(N) $(DURATION)
+
+tokio-metrics:
+	@scripts/tokio-metrics.sh $(PHASE) $(N) $(DURATION) $(POLL_INTERVAL)
