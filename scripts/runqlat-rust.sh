@@ -210,7 +210,13 @@ capture_runqlat() {
     flags+=(-L)
   fi
   echo "Capturing run-queue latency via ${RUNQLAT_BIN} for ${DURATION}s..."
-  sudo "${RUNQLAT_BIN}" "${flags[@]}" "${DURATION}" 1 > "${RAW}"
+  # `tee` instead of a plain `>` redirect: runqlat-bpfcc writes its status
+  # line, histogram, and any error text all to stdout (not stderr), so a
+  # bare redirect swallows failures silently into ${RAW} with nothing shown
+  # on screen. `2>&1 | tee` surfaces everything live while still capturing
+  # it; `set -o pipefail` (from `set -euo pipefail` above) makes a failing
+  # runqlat still fail the pipeline even though `tee` itself exits 0.
+  sudo "${RUNQLAT_BIN}" "${flags[@]}" "${DURATION}" 1 2>&1 | tee "${RAW}"
   echo "Wrote ${RAW}"
   summarize_histogram "${RAW}" "${SUMMARY}"
   echo "Wrote ${SUMMARY}"
